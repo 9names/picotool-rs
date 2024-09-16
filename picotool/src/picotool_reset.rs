@@ -6,34 +6,37 @@ use nusb::{
 const RP_VID: u16 = 0x2E8A;
 
 const RESET_REQUEST_BOOTSEL: u8 = 0x01;
-//const RESET_REQUEST_FLASH: u8 = 0x02;
+// const RESET_REQUEST_FLASH: u8 = 0x02;
 
 pub fn reset_usb_device() {
     let devices: Vec<DeviceInfo> = nusb::list_devices()
         .unwrap()
         .filter(|d| d.vendor_id() == RP_VID)
         .collect();
+
+    if devices.is_empty() {
+        println!("No USB devices found with a Raspberry Pi VendorID");
+        return;
+    }
+
     if devices.len() > 1 {
         println!("Found more than one device. Using the first one found");
     }
 
-    let device = devices.first().unwrap();
-    let device_handle = device.open().unwrap();
-    let mut interfacelist: Vec<u8> = vec![];
-    for config in device_handle.configurations() {
-        for interface in config.interfaces() {
-            for altsetting in interface.alt_settings() {
-                if altsetting.class() == 0xff
-                    && altsetting.subclass() == 0
-                    && altsetting.protocol() == 1
-                {
-                    println!("found a possible reset interface");
-                    interfacelist.push(interface.interface_number());
-                }
-            }
-        }
+    let device_handle = devices.first().unwrap().open().unwrap();
+    let reset_devices: Vec<u8> = device_handle.configurations().flat_map(|cfg| {
+        cfg.interface_alt_settings()
+            .filter(|alt| alt.class() == 0xff && alt.subclass() == 0 && alt.protocol() == 1)
+            .map(|i| i.interface_number())
+    }).collect();
+
+    if reset_devices.is_empty() {
+        println!("A device was found with a Raspberry Pi VendorID, but it did not have the USB Reset interface");
+        return;
     }
-    for iface in interfacelist {
+
+    println!("Resetting pico...");
+    for iface in reset_devices {
         let d = device_handle
             .claim_interface(iface)
             .or(device_handle.detach_and_claim_interface(iface))
@@ -46,8 +49,5 @@ pub fn reset_usb_device() {
             index: iface as u16,
             data: &[],
         }));
-        // On successful reset, we get a USB stall.
-        // The only way we can tell if we succeeded would be to connect via picoboot
-        // so don't try to handle the result
     }
 }
