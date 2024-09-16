@@ -1,4 +1,5 @@
 pub mod picoboot;
+pub mod picotool_reset;
 
 pub const PICO_PAGE_SIZE: usize = 256;
 pub const PICO_SECTOR_SIZE: u32 = 4096;
@@ -6,6 +7,7 @@ pub const PICO_FLASH_START: u32 = 0x10000000;
 pub const PICO_STACK_POINTER: u32 = 0x20042000;
 
 use picoboot::usb::PicobootConnection;
+
 use std::path::Path;
 use uf2_decode::convert_from_uf2;
 
